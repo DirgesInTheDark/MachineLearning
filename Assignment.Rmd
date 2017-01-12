@@ -1,0 +1,84 @@
+---
+title: "Machine Learning"
+author: "S. Hughes"
+date: "1/12/2017"
+output: html_document
+---
+```{r setup, include = FALSE}
+library(caret)
+set.seed(6095)
+```
+###Purpose 
+
+To use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants to determine which exercises the participant is doing and whether or not the exercises being performed are done so correctly or incorrectly. 
+
+###Getting the data 
+
+Getting data from the  Qualitative Activity Recognition of Weight Lifting Exercises dataset by (Velloso et al, 2013). 
+
+```{r getdata, cache = TRUE}
+url_train <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+url_test <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+training <- read.csv(url_train, stringsAsFactors = FALSE)
+test <- read.csv(url_test, stringsAsFactors = FALSE)
+```
+
+###Cleaning the data
+
+Removing and simplifiying the training and test data from columns with little to no information relevant to the model. It simplifies the data from 159 to 53 features (not including the dependent variable). 
+
+```{r cleanData}
+training$user_name <- as.factor(training$user_name)
+test$user_name <- as.factor(test$user_name)
+remove_col <- c(1, 3:7, 12:36, 50:59, 69:83, 87:101,
+                103:112,125:139,141:150)
+
+simp_training <- training[,-remove_col]
+simp_test <- test[,-remove_col]
+```
+
+###Creating a cross validation set 
+
+Creates a cross validation set to compare against later on. This ensures that the model can have data as a benchmark that was not used in training the model.
+
+```{r makeCV}
+inTrain <-createDataPartition(y = simp_training$classe, 
+                              p = 0.75, list = FALSE )
+simp_training <- simp_training[inTrain,]
+simp_cv <- simp_training[-inTrain,]
+```
+
+
+###Fitting the model 
+
+Decided to use a Random Forest based approach due to the nature of the dependant variable, namely categorical, as well as its high accuracy. Prior to fitting the model, the data was preprocessed using a pca method to further reduce the number of regressors while still keeping the information from them. 
+
+```{r fit_model, cache=TRUE, warning=FALSE, message=FALSE}
+mdl <- train(as.factor(classe)~. ,preProcess = "pca", 
+             simp_training, method = "rf")
+mdl
+```
+
+The model appears to fit quite well against the training set, with a high level of accuracy (0.97)
+
+###Model on Cross Validation Set
+
+Compared the fit of the model against the benchmark for an indication of overfitting.
+
+```{r predict_cv}
+simp_cv$classe <- as.factor(simp_cv$classe)
+pred_cv <- predict(mdl, simp_cv)
+confusionMatrix(pred_cv,simp_cv$classe)
+```
+
+The model also appears to work with the cross validation set. 
+
+###Model on Test Set
+
+With reasonable accuracy on both the test and the cross validation set, and little evidence of overfitting, the model is tested to check its predictive capabilities.
+
+```{r predict_test}
+predict(mdl, simp_test)
+```
+
+Which is 95% accurate. Therefore the model likely to be a reasoable predictor on how well the exercises are being performed. 
